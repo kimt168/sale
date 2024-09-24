@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Model Prediction</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        background-color: #f4f4f4;
+      }
+
+      .container {
+        display: flex;
+        flex-direction: column;
+        width: 80%;
+        max-width: 1200px;
+        background-color: #fff;
+        border-radius: 10px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        margin: auto;
+        flex: 1;
+      }
+
+      header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px 20px;
+        background-color: #f9f9f9;
+        border-bottom: 1px solid #ddd;
+      }
+
+      .header img {
+        max-width: 120px; /* Đặt kích thước tối đa cho cả hai logo */
+        height: auto;
+        border-radius: 5px; /* Bo góc nhẹ cho hình ảnh */
+      }
+
+      .main-content {
+        display: flex;
+        flex: 1;
+        padding: 20px;
+      }
+
+      .left,
+      .right {
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between; /* Đảm bảo nội dung bên phải được căn chỉnh theo chiều dọc */
+        box-sizing: border-box; /* Đảm bảo padding và border được tính vào chiều rộng */
+      }
+
+      .left {
+        width: 48%; /* Giảm kích thước để tạo khoảng cách giữa hai ô */
+        padding: 20px;
+        background-color: #f9f9f9;
+        border: 1px solid #ddd;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        margin-right: 2%; /* Tạo khoảng cách giữa hai ô */
+      }
+
+      .right {
+        width: 50%; /* Giữ kích thước của ô bên phải */
+        padding: 20px;
+        background-color: #f9f9f9;
+        border: 1px solid #ddd;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      }
+
+      form {
+        width: 100%;
+      }
+
+      label {
+        display: block;
+        margin-bottom: 10px;
+        font-weight: bold;
+      }
+
+      input[type="number"],
+      select {
+        width: calc(
+          100% - 20px
+        ); /* Đảm bảo hộp nhập liệu và chọn chiếm toàn bộ chiều rộng của vùng chứa */
+        padding: 10px;
+        margin-bottom: 15px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        font-size: 16px;
+        box-sizing: border-box; /* Đảm bảo padding và border được tính vào chiều rộng */
+      }
+
+      button {
+        width: calc(
+          100% - 20px
+        ); /* Đảm bảo nút bấm cũng có cùng kích thước với các hộp nhập liệu */
+        padding: 10px;
+        background-color: #28a745;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        font-size: 16px;
+        cursor: pointer;
+        outline: none;
+        transition: background-color 0.3s ease;
+        box-sizing: border-box; /* Đảm bảo padding và border được tính vào chiều rộng */
+      }
+
+      button:hover {
+        background-color: #218838;
+      }
+
+      button:active {
+        transform: scale(0.98);
+      }
+
+      #metrics,
+      #plot {
+        background-color: #f9f9f9;
+        padding: 20px;
+        border-radius: 5px;
+        margin-bottom: 15px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        flex: 1; /* Cho phép các phần tử bên phải mở rộng đều theo chiều cao */
+        overflow: auto; /* Đảm bảo rằng các phần tử có thể cuộn nếu nội dung quá dài */
+      }
+
+      #metrics p,
+      #result p {
+        margin: 5px 0;
+        font-size: 16px;
+      }
+
+      /* Điều chỉnh chiều cao của ô "Prediction Result" */
+      #plot {
+        height: 400px; /* Thay đổi giá trị này để điều chỉnh chiều cao */
+      }
+
+      @media (max-width: 768px) {
+        .main-content {
+          flex-direction: column;
+        }
+
+        .left,
+        .right {
+          width: 100%;
+          margin-right: 0; /* Đảm bảo khoảng cách không còn khi trên màn hình nhỏ */
+          margin-bottom: 20px; /* Thêm khoảng cách dưới mỗi ô */
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <!-- Hàng chứa logo và hình ảnh -->
+      <header>
+        <img
+          src="https://lh4.googleusercontent.com/cFGqdbQ9qmbqTV9xVRcLcVlLjAHU0UIxA6mSIqSfjWneEFnXVTU6GypahVFX2Yo6ExNxISDF_uFbydqFQVUn5b-2i4PQR9LNnrxt9T0FRBFMw7Gg5TQ1GNfaMfhQIgVyzMT8Uzwz"
+          alt="University Logo"
+        />
+      </header>
+
+      <div class="main-content">
+        <div class="left">
+          <h1>Predict ad spend impact</h1>
+          <form id="predictionForm">
+            <label for="tv">TV ad budget ($):</label>
+            <input type="number" id="tv" name="tv" step="any" required />
+
+            <label for="radio">Radio ad budget ($):</label>
+            <input type="number" id="radio" name="radio" step="any" required />
+
+            <label for="newspaper">Newspaper ad budget ($):</label>
+            <input
+              type="number"
+              id="newspaper"
+              name="newspaper"
+              step="any"
+              required
+            />
+
+            <label for="model">Model:</label>
+            <select id="model" name="model">
+              <option value="linear">Linear regression</option>
+              <option value="ridge">Ridge regression</option>
+              <option value="mlp">Neural network</option>
+              <option value="stacking">Stacking</option>
+
+            </select>
+
+            <button type="submit">Predict</button>
+          </form>
+        </div>
+
+        <div class="right">
+          <div id="metrics">
+            <h2>Model metrics</h2>
+            <!-- Metrics will be displayed here -->
+          </div>
+
+          <div id="plot">
+            <h2>Prediction result</h2>
+            <div id="result">
+              <!-- Result will be displayed here -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      $(document).ready(function () {
+        $("#predictionForm").on("submit", function (event) {
+          event.preventDefault();
+          const tv = $("#tv").val();
+          const radio = $("#radio").val();
+          const newspaper = $("#newspaper").val();
+          const model = $("#model").val();
+
+          $.ajax({
+            url: "/predict",
+            type: "POST",
+            contentType: "application/json",
+            data: JSON.stringify({ tv, radio, newspaper, model }),
+            success: function (response) {
+              if (response.error) {
+                $("#result").html(`<p>Error: ${response.error}</p>`);
+              } else {
+                $("#result").html(`<p>Prediction: $${response.prediction}</p>`);
+                $("#metrics").html(`
+                <p>Training R2: ${response.metrics.train_r2.toFixed(4)}</p>
+                <p>Validation R2: ${response.metrics.val_r2.toFixed(4)}</p>
+                <p>Testing R2: ${response.metrics.test_r2.toFixed(4)}</p>
+                <p>Training MSE: ${response.metrics.train_mse.toFixed(4)}</p>
+                <p>Validation MSE: ${response.metrics.val_mse.toFixed(4)}</p>
+                <p>Testing MSE: ${response.metrics.test_mse.toFixed(4)}</p>
+                <p>Training RMSE: ${response.metrics.train_rmse.toFixed(4)}</p>
+                <p>Validation RMSE: ${response.metrics.val_rmse.toFixed(4)}</p>
+                <p>Testing RMSE: ${response.metrics.test_rmse.toFixed(4)}</p>
+              `);
+              }
+            },
+            error: function (xhr, status, error) {
+              $("#result").html(`<p>Error: ${error}</p>`);
+            },
+          });
+        });
+      });
+    </script>
+  </body>
+</html>
