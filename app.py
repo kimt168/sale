@@ -306,6 +306,7 @@ import pandas as pd
 import numpy as np
 from sklearn.linear_model import Ridge
 from sklearn.metrics import r2_score, mean_squared_error
+from sklearn.model_selection import GridSearchCV
 
 app = Flask(__name__)
 
@@ -325,76 +326,104 @@ Test_X_std = pd.read_csv(r'./Data/Test_X_std.csv')
 Test_Y = pd.read_csv(r'./Data/Test_Y.csv').values.ravel()
 
 
-# Step 1: Load the data
-train_X = pd.read_csv('Data/Train_X_std.csv')
-train_Y = pd.read_csv('Data/Train_Y.csv')
-val_X = pd.read_csv('Data/Val_X_std.csv')
-val_Y = pd.read_csv('Data/Val_Y.csv')
-test_X = pd.read_csv('Data/Test_X_std.csv')
-test_Y = pd.read_csv('Data/Test_Y.csv')
+def stacking_evaluated():
+        # Step 1: Load the data
+    train_X = pd.read_csv('./TrainingData/Train_X_std.csv')
+    train_Y = pd.read_csv('./TrainingData/Train_Y.csv')
+    val_X = pd.read_csv('./TrainingData/Val_X_std.csv')
+    val_Y = pd.read_csv('./TrainingData/Val_Y.csv')
+    test_X = pd.read_csv('./TrainingData/Test_X_std.csv')
+    test_Y = pd.read_csv('./TrainingData/Test_Y.csv')
+
+    # Step 2: Load pre-trained models
+    linear_model_train = joblib.load('./TrainingData/linear_regression_model.pkl')
+    mlp_model_train = joblib.load('./TrainingData/mlp_regression_model.pkl')
+    ridge_model_train = joblib.load('./TrainingData/ridge_regression_model2.pkl')
+
+    # Step 3: Create first-level predictions
+    train_pred_linear = linear_model_train.predict(train_X)
+    train_pred_mlp = mlp_model_train.predict(train_X)
+    train_pred_ridge = ridge_model_train.predict(train_X)
+
+    val_pred_linear = linear_model_train.predict(val_X)
+    val_pred_mlp = mlp_model_train.predict(val_X)
+    val_pred_ridge = ridge_model_train.predict(val_X)
+
+    test_pred_linear = linear_model_train.predict(test_X)
+    test_pred_mlp = mlp_model_train.predict(test_X)
+    test_pred_ridge = ridge_model_train.predict(test_X)
+
+    # Stack predictions for meta-model
+    train_meta_X = np.column_stack((train_pred_linear, train_pred_mlp, train_pred_ridge))
+    val_meta_X = np.column_stack((val_pred_linear, val_pred_mlp, val_pred_ridge))
+    test_meta_X = np.column_stack((test_pred_linear, test_pred_mlp, test_pred_ridge))
+
+    # Step 4: Use GridSearchCV to optimize Ridge Regression
+    param_grid = {'alpha': [0.1, 1.0, 10.0, 100.0]}
+    ridge_cv = GridSearchCV(Ridge(), param_grid, cv=5)
+    ridge_cv.fit(train_meta_X, train_Y)
+
+    # Use the best model from GridSearchCV
+    meta_model = ridge_cv.best_estimator_
+
+    # Step 5: Evaluate the meta-model on validation set
+    val_meta_pred = meta_model.predict(val_meta_X)
+    val_mse = mean_squared_error(val_Y, val_meta_pred)
+    val_r2 = r2_score(val_Y, val_meta_pred)
+
+    print(f'Validation MSE of Stacked Model: {val_mse}')
+    print(f'Validation R-squared of Stacked Model: {val_r2}')
+
+    # Step 6: Make final predictions on the test set
+    test_meta_pred = meta_model.predict(test_meta_X)
+    test_mse = mean_squared_error(test_Y, test_meta_pred)
+    test_r2 = r2_score(test_Y, test_meta_pred)
+
+    print(f'Test MSE of Stacked Model: {test_mse}')
+    print(f'Test R-squared of Stacked Model: {test_r2}')
+
+    # Step 7: Perform cross-validation for generalization check
+    from sklearn.model_selection import cross_val_score
+    cv_scores = cross_val_score(meta_model, train_meta_X, train_Y, cv=5, scoring='r2')
+    # Step 8: Calculate and print the evaluation metrics
+    # Training evaluation
+    train_meta_pred = meta_model.predict(train_meta_X)
+    train_r2 = r2_score(train_Y, train_meta_pred)
+    train_mse = mean_squared_error(train_Y, train_meta_pred)
+    train_rmse = np.sqrt(train_mse)
+    val_rmse = np.sqrt(val_mse)
+    test_rmse = np.sqrt(test_mse)
+    return {
+        'train_r2': train_r2,
+        'val_r2': val_r2,
+        'test_r2': test_r2,
+        'train_mse': train_mse,
+        'val_mse': val_mse,
+        'test_mse': test_mse,
+        'train_rmse': train_rmse,
+        'val_rmse': val_rmse,
+        'test_rmse': test_rmse
+    }
+
+
 # Hàm đánh giá mô hình
 def evaluate_model(model, X_train, Y_train, X_val, Y_val, X_test, Y_test):
-    if(model == stacking_model):
-        # Step 1: Load the data
-        train_X = pd.read_csv('/content/drive/MyDrive/TrainingData/Train_X_std.csv')
-        train_Y = pd.read_csv('/content/drive/MyDrive/TrainingData/Train_Y.csv')
-        val_X = pd.read_csv('/content/drive/MyDrive/TrainingData/Val_X_std.csv')
-        val_Y = pd.read_csv('/content/drive/MyDrive/TrainingData/Val_Y.csv')
-        test_X = pd.read_csv('/content/drive/MyDrive/TrainingData/Test_X_std.csv')
-        test_Y = pd.read_csv('/content/drive/MyDrive/TrainingData/Test_Y.csv')
-
-        # Step 2: Load pre-trained models
-        linear_model = joblib.load('/content/drive/MyDrive/TrainingData/linear_regression_model.pkl')
-        mlp_model = joblib.load('/content/drive/MyDrive/TrainingData/mlp_regression_model.pkl')
-        ridge_model = joblib.load('/content/drive/MyDrive/TrainingData/ridge_regression_model2.pkl')
-
-        # Step 3: Create first-level predictions
-        train_pred_linear = linear_model.predict(train_X)
-        train_pred_mlp = mlp_model.predict(train_X)
-        train_pred_ridge = ridge_model.predict(train_X)
-
-        val_pred_linear = linear_model.predict(val_X)
-        val_pred_mlp = mlp_model.predict(val_X)
-        val_pred_ridge = ridge_model.predict(val_X)
-
-        # Stack predictions for meta-model
-        train_meta_X = np.column_stack((train_pred_linear, train_pred_mlp, train_pred_ridge))
-        val_meta_X = np.column_stack((val_pred_linear, val_pred_mlp, val_pred_ridge))
-
-        # Step 3.1: Create first-level predictions for test set
-        test_pred_linear = linear_model.predict(test_X)
-        test_pred_mlp = mlp_model.predict(test_X)
-        test_pred_ridge = ridge_model.predict(test_X)
-
-        # Stack predictions for the test set
-        test_meta_X = np.column_stack((test_pred_linear, test_pred_mlp, test_pred_ridge))
-
-        # Step 4: Train the meta-model (Ridge Regression)
-        meta_model = Ridge(alpha=1.0)  # You can tune the alpha value
-        meta_model.fit(train_meta_X, train_Y)
-
-        # Step 7: Calculate additional metrics for training set
-        train_meta_pred = meta_model.predict(train_meta_X)
-        train_mse = mean_squared_error(train_Y, train_meta_pred)
-        train_r2 = r2_score(train_Y, train_meta_pred)
-        train_rmse = np.sqrt(train_mse)
-
-    else:        
+           
         # Dự đoán trên tập huấn luyện, tập xác thực và tập kiểm tra
-        train_preds = model.predict(X_train)
-        val_preds = model.predict(X_val)
-        test_preds = model.predict(X_test)
+    train_preds = model.predict(X_train)
+    val_preds = model.predict(X_val)
+    test_preds = model.predict(X_test)
 
         # Tính toán các chỉ số đánh giá
-        train_r2 = r2_score(Y_train, train_preds)
-        val_r2 = r2_score(Y_val, val_preds)
-        test_r2 = r2_score(Y_test, test_preds)
-        train_mse = mean_squared_error(Y_train, train_preds)
-        val_mse = mean_squared_error(Y_val, val_preds)
-        test_mse = mean_squared_error(Y_test, test_preds)
-        train_rmse = np.sqrt(train_mse)
-        val_rmse = np.sqrt(val_mse)
-        test_rmse = np.sqrt(test_mse)
+    train_r2 = r2_score(Y_train, train_preds)
+    val_r2 = r2_score(Y_val, val_preds)
+    test_r2 = r2_score(Y_test, test_preds)
+    train_mse = mean_squared_error(Y_train, train_preds)
+    val_mse = mean_squared_error(Y_val, val_preds)
+    test_mse = mean_squared_error(Y_test, test_preds)
+    train_rmse = np.sqrt(train_mse)
+    val_rmse = np.sqrt(val_mse)
+    test_rmse = np.sqrt(test_mse)
 
     return {
         'train_r2': train_r2,
@@ -432,8 +461,7 @@ def predict(model, tv, radio, newspaper):
         meta_input = np.column_stack((pred_linear, pred_mlp, pred_ridge))
         model = joblib.load('meta_model.pkl')
         prediction = model.predict(meta_input) 
-        metrics = evaluate_model(model, Train_X_std, Train_Y, Val_X_std, Val_Y, Test_X_std, Test_Y)
-   
+        metrics = stacking_evaluated()
     else:
         input_data = pd.DataFrame([[tv, radio, newspaper]], columns=['TV_Ad_Budget_($)', 'Radio_Ad_Budget_($)', 'Newspaper_Ad_Budget_($)'])
         prediction = model.predict(input_data)[0]
