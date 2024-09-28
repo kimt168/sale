@@ -192,7 +192,7 @@
             <select id="model" name="model">
               <option value="linear">Linear regression</option>
               <option value="ridge">Ridge regression</option>
-              <option value="mlp">Neural network</option>
+              <option value="neural_network">Neural network</option>
               <option value="stacking">Stacking</option>
 
             </select>
@@ -232,7 +232,7 @@
               if (response.error) {
                 $("#result").html(`<p>Error: ${response.error}</p>`);
               } else {
-                $("#result").html(`<p>Prediction: $${response.prediction}</p>`);
+                $("#result").html(`<p>Prediction using ${model} model: $${response.prediction}</p>`);
                 $("#metrics").html(`
                 <p>Training R2: ${response.metrics.train_r2.toFixed(4)}</p>
                 <p>Validation R2: ${response.metrics.val_r2.toFixed(4)}</p>

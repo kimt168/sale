@@ -462,7 +462,7 @@ def predict(model, tv, radio, newspaper):
         # Bước 2: Stack các dự đoán từ mô hình cấp 1
         meta_input = np.column_stack((pred_linear, pred_mlp, pred_ridge))
         
-        model = joblib.load('meta_model.pkl')
+        model = joblib.load('stacked_meta_model_best_alpha.pkl')
         prediction = model.predict(meta_input) 
         metrics = stacking_evaluated()
     else:
@@ -489,7 +489,7 @@ def predict_sales():
             model = linear_model
         elif model_choice == 'ridge':
             model = ridge_model
-        elif model_choice == 'mlp':
+        elif model_choice == 'neural_network':
             model = mlp_model
         elif model_choice == 'stacking':
             model = stacking_model
