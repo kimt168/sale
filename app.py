@@ -308,6 +308,7 @@ from sklearn.linear_model import Ridge
 from sklearn.model_selection import GridSearchCV
 
 from sklearn.metrics import r2_score, mean_squared_error
+from sklearn.model_selection import GridSearchCV
 
 app = Flask(__name__)
 
@@ -345,6 +346,14 @@ def evaluate_model(model, X_train, Y_train, X_val, Y_val, X_test, Y_test):
         val_Y = pd.read_csv('/Data/Val_Y.csv').squeeze()
         test_X = pd.read_csv('/Data/Test_X_std.csv')
         test_Y = pd.read_csv('/Data/Test_Y.csv').squeeze()
+def stacking_evaluated():
+        # Step 1: Load the data
+    train_X = pd.read_csv('./TrainingData/Train_X_std.csv')
+    train_Y = pd.read_csv('./TrainingData/Train_Y.csv')
+    val_X = pd.read_csv('./TrainingData/Val_X_std.csv')
+    val_Y = pd.read_csv('./TrainingData/Val_Y.csv')
+    test_X = pd.read_csv('./TrainingData/Test_X_std.csv')
+    test_Y = pd.read_csv('./TrainingData/Test_Y.csv')
 
         # Step 2: Load pre-trained models
         linear_model = joblib.load('/Data/linear_regression_model.pkl')
@@ -401,12 +410,12 @@ def evaluate_model(model, X_train, Y_train, X_val, Y_val, X_test, Y_test):
         test_rmse = np.sqrt(test_mse)
 
     else:        
-        # Dự đoán trên tập huấn luyện, tập xác thực và tập kiểm tra
+            # Dự đoán trên tập huấn luyện, tập xác thực và tập kiểm tra
         train_preds = model.predict(X_train)
         val_preds = model.predict(X_val)
         test_preds = model.predict(X_test)
 
-        # Tính toán các chỉ số đánh giá
+            # Tính toán các chỉ số đánh giá
         train_r2 = r2_score(Y_train, train_preds)
         val_r2 = r2_score(Y_val, val_preds)
         test_r2 = r2_score(Y_test, test_preds)
@@ -454,8 +463,7 @@ def predict(model, tv, radio, newspaper):
         
         model = joblib.load('meta_model.pkl')
         prediction = model.predict(meta_input) 
-        metrics = evaluate_model(model, Train_X_std, Train_Y, Val_X_std, Val_Y, Test_X_std, Test_Y)
-   
+        metrics = stacking_evaluated()
     else:
         input_data = pd.DataFrame([[tv, radio, newspaper]], columns=['TV_Ad_Budget_($)', 'Radio_Ad_Budget_($)', 'Newspaper_Ad_Budget_($)'])
         prediction = model.predict(input_data)[0]
