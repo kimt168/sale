@@ -305,6 +305,8 @@ import joblib
 import pandas as pd
 import numpy as np
 from sklearn.linear_model import Ridge
+from sklearn.model_selection import GridSearchCV
+
 from sklearn.metrics import r2_score, mean_squared_error
 
 app = Flask(__name__)
@@ -313,7 +315,7 @@ app = Flask(__name__)
 linear_model = joblib.load(r'./Data/linear_regression_model.pkl')
 ridge_model = joblib.load(r'./Data/ridge_regression_model.pkl')
 mlp_model = joblib.load(r'./Data/mlp_regression_model.pkl')
-stacking_model = joblib.load(r'./Data/mlp_regression_model.pkl')
+stacking_model = joblib.load(r'meta_model.pkl')
 
 
 # Đọc dữ liệu để đánh giá mô hình
@@ -332,21 +334,22 @@ val_X = pd.read_csv('Data/Val_X_std.csv')
 val_Y = pd.read_csv('Data/Val_Y.csv')
 test_X = pd.read_csv('Data/Test_X_std.csv')
 test_Y = pd.read_csv('Data/Test_Y.csv')
+
 # Hàm đánh giá mô hình
 def evaluate_model(model, X_train, Y_train, X_val, Y_val, X_test, Y_test):
     if(model == stacking_model):
-        # Step 1: Load the data
-        train_X = pd.read_csv('/content/drive/MyDrive/TrainingData/Train_X_std.csv')
-        train_Y = pd.read_csv('/content/drive/MyDrive/TrainingData/Train_Y.csv')
-        val_X = pd.read_csv('/content/drive/MyDrive/TrainingData/Val_X_std.csv')
-        val_Y = pd.read_csv('/content/drive/MyDrive/TrainingData/Val_Y.csv')
-        test_X = pd.read_csv('/content/drive/MyDrive/TrainingData/Test_X_std.csv')
-        test_Y = pd.read_csv('/content/drive/MyDrive/TrainingData/Test_Y.csv')
+                # Step 1: Load the data
+        train_X = pd.read_csv('/Data/Train_X_std.csv')
+        train_Y = pd.read_csv('/Data/Train_Y.csv').squeeze()  # Ensure it's a 1D array
+        val_X = pd.read_csv('/Data/Val_X_std.csv')
+        val_Y = pd.read_csv('/Data/Val_Y.csv').squeeze()
+        test_X = pd.read_csv('/Data/Test_X_std.csv')
+        test_Y = pd.read_csv('/Data/Test_Y.csv').squeeze()
 
         # Step 2: Load pre-trained models
-        linear_model = joblib.load('/content/drive/MyDrive/TrainingData/linear_regression_model.pkl')
-        mlp_model = joblib.load('/content/drive/MyDrive/TrainingData/mlp_regression_model.pkl')
-        ridge_model = joblib.load('/content/drive/MyDrive/TrainingData/ridge_regression_model2.pkl')
+        linear_model = joblib.load('/Data/linear_regression_model.pkl')
+        mlp_model = joblib.load('/Data/mlp_regression_model.pkl')
+        ridge_model = joblib.load('/Data/ridge_regression_model.pkl')
 
         # Step 3: Create first-level predictions
         train_pred_linear = linear_model.predict(train_X)
@@ -357,27 +360,45 @@ def evaluate_model(model, X_train, Y_train, X_val, Y_val, X_test, Y_test):
         val_pred_mlp = mlp_model.predict(val_X)
         val_pred_ridge = ridge_model.predict(val_X)
 
-        # Stack predictions for meta-model
-        train_meta_X = np.column_stack((train_pred_linear, train_pred_mlp, train_pred_ridge))
-        val_meta_X = np.column_stack((val_pred_linear, val_pred_mlp, val_pred_ridge))
-
-        # Step 3.1: Create first-level predictions for test set
         test_pred_linear = linear_model.predict(test_X)
         test_pred_mlp = mlp_model.predict(test_X)
         test_pred_ridge = ridge_model.predict(test_X)
 
-        # Stack predictions for the test set
+        # Stack predictions for meta-model
+        train_meta_X = np.column_stack((train_pred_linear, train_pred_mlp, train_pred_ridge))
+        val_meta_X = np.column_stack((val_pred_linear, val_pred_mlp, val_pred_ridge))
         test_meta_X = np.column_stack((test_pred_linear, test_pred_mlp, test_pred_ridge))
 
-        # Step 4: Train the meta-model (Ridge Regression)
-        meta_model = Ridge(alpha=1.0)  # You can tune the alpha value
-        meta_model.fit(train_meta_X, train_Y)
+        # Step 4: Use GridSearchCV to optimize Ridge Regression
+        param_grid = {'alpha': [0.1, 1.0, 10.0, 100.0]}
+        ridge_cv = GridSearchCV(Ridge(), param_grid, cv=5)
+        ridge_cv.fit(train_meta_X, train_Y)
 
-        # Step 7: Calculate additional metrics for training set
+        # Use the best model from GridSearchCV
+        meta_model = ridge_cv.best_estimator_
+
+        # Step 5: Evaluate the meta-model on validation set
+        val_meta_pred = meta_model.predict(val_meta_X)
+        val_mse = mean_squared_error(val_Y, val_meta_pred)
+        val_r2 = r2_score(val_Y, val_meta_pred)
+
+        # Step 6: Make final predictions on the test set
+        test_meta_pred = meta_model.predict(test_meta_X)
+        test_mse = mean_squared_error(test_Y, test_meta_pred)
+        test_r2 = r2_score(test_Y, test_meta_pred)
+
+        # Step 7: Calculate and print the evaluation metrics
+        # Training evaluation
         train_meta_pred = meta_model.predict(train_meta_X)
-        train_mse = mean_squared_error(train_Y, train_meta_pred)
         train_r2 = r2_score(train_Y, train_meta_pred)
+        train_mse = mean_squared_error(train_Y, train_meta_pred)
         train_rmse = np.sqrt(train_mse)
+
+        # Validation RMSE
+        val_rmse = np.sqrt(val_mse)
+
+        # Test RMSE
+        test_rmse = np.sqrt(test_mse)
 
     else:        
         # Dự đoán trên tập huấn luyện, tập xác thực và tập kiểm tra
@@ -430,6 +451,7 @@ def predict(model, tv, radio, newspaper):
         pred_ridge = ridge_model.predict(input_data_df)
         # Bước 2: Stack các dự đoán từ mô hình cấp 1
         meta_input = np.column_stack((pred_linear, pred_mlp, pred_ridge))
+        
         model = joblib.load('meta_model.pkl')
         prediction = model.predict(meta_input) 
         metrics = evaluate_model(model, Train_X_std, Train_Y, Val_X_std, Val_Y, Test_X_std, Test_Y)
@@ -470,7 +492,7 @@ def predict_sales():
         return jsonify({
             'model': model_choice,
             'prediction': float(prediction),
-            'metrics': metrics
+            # 'metrics': metrics
         })
     except Exception as e:
         return jsonify({'error': str(e)})
